@@ -1,118 +1,206 @@
 import streamlit as st
-import google.generativeai as genai
+from groq import Groq
 import pandas as pd
-import datetime
+import time
 
 # ---------------------------------------------------------
-# 1. PAGE SETUP
+# 1. PROFESSIONAL PAGE CONFIG & CSS
 # ---------------------------------------------------------
-st.set_page_config(page_title="LifeCompanion AI", page_icon="🧠", layout="wide")
+st.set_page_config(
+    page_title="LifeCompanion Pro",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Custom CSS
+# Professional styling to hide clutter and enhance chat bubbles
 st.markdown("""
 <style>
-    .stChatMessage {
-        background-color: #f0f2f6; 
+    /* Import a professional font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Clean up Streamlit UI */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Chat bubble styling */
+    .stChatMessage[data-testid="stChatMessageAvatarUser"] {
+        background-color: #f0f2f6;
+    }
+    .stChatMessage[data-testid="stChatMessageAvatarAssistant"] {
+        background-color: #e8f4f9;
+        border: 1px solid #d1e7dd;
+    }
+    .stChatMessageContent {
         border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 5px;
+        padding: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. SECURE CONNECTION (Hosting & Local)
+# 2. SECURE GROQ CLIENT SETUP
 # ---------------------------------------------------------
 try:
-    # This works when hosted on Streamlit Cloud
-    api_key = st.secrets["GOOGLE_API_KEY"]
-except:
-    # This works on your computer. 
-    # REPLACE THE TEXT BELOW WITH YOUR ACTUAL KEY
-    api_key = "PASTE_YOUR_AIza_KEY_HERE"
+    # Try getting key from Streamlit Secrets (for hosting)
+    groq_api_key = st.secrets["GROQ_API_KEY"]
+except FileNotFoundError:
+    # Fallback for local testing without secrets.toml
+    # REPLACE WITH YOUR KEY FOR LOCAL RUNS ONLY. DON'T COMMIT TO GITHUB.
+    groq_api_key = "PASTE_YOUR_GROQ_KEY_HERE_FOR_LOCAL_TESTING"
 
-if api_key == "PASTE_YOUR_AIza_KEY_HERE":
-    st.error("⚠️ API Key Missing! Please paste your key in line 28 of the code.")
+if groq_api_key == "PASTE_YOUR_GROQ_KEY_HERE_FOR_LOCAL_TESTING" or not groq_api_key:
+    st.warning("⚠️ **Groq API Key Missing.** Please set it in Streamlit Secrets for hosting.")
     st.stop()
 
-genai.configure(api_key=api_key)
+client = Groq(api_key=groq_api_key)
 
 # ---------------------------------------------------------
-# 3. KNOWLEDGE BASE
+# 3. INTERNAL KNOWLEDGE BASE
 # ---------------------------------------------------------
 data = {
-    "topic": ["anxiety", "study tips", "acne", "sleep", "procrastination"],
+    "topic": ["anxiety", "study tips", "pomodoro", "acne", "sleep hygiene", "procrastination", "motivation"],
     "advice": [
-        "Grounding: Name 5 things you see, 4 feel, 3 hear, 2 smell, 1 taste.",
-        "Pomodoro: 25 min work, 5 min break. Repeat 4 times.",
-        "Hygiene: Wash face 2x daily. Change pillowcases.",
-        "Sleep: No screens 1hr before bed. Keep room cool.",
-        "2-Minute Rule: If it takes <2 mins, do it now."
+        "Use the 5-4-3-2-1 Grounding Technique: Acknowledge 5 things you see, 4 you feel, 3 hear, 2 smell, 1 taste.",
+        "Break work into chunks. Focus on active recall rather than passive re-reading.",
+        "Pomodoro Technique: 25 minutes intense focus, 5 minutes break. Repeat 4 cycles, then take a 20-minute break.",
+        "Wash face twice daily with gentle cleanser. Avoid touching your face. Change pillowcases frequently.",
+        "Maintain a cool, dark room. No screens 60 mins before bed. Stick to a consistent sleep schedule.",
+        "Use the '2-Minute Rule': If a task takes less than 2 minutes, do it immediately to build momentum.",
+        "Do not wait for motivation. Action leads to motivation. Start for just 5 minutes."
     ]
 }
 df = pd.DataFrame(data)
 
 def get_context(query):
+    """Retrieves relevant advice from the internal dataset."""
     for i, row in df.iterrows():
         if row['topic'] in query.lower():
             return row['advice']
-    return "No specific database record."
+    return None
 
 # ---------------------------------------------------------
-# 4. UI & LOGIC
+# 4. PROFESSIONAL PERSONA DEFINITIONS
 # ---------------------------------------------------------
-st.sidebar.title("🤖 Companion AI")
-mode = st.sidebar.selectbox("Choose Persona:", ["Emotional Buddy 💙", "Exam Motivator 🔥", "Adolescent Helper 🌱"])
+personas = {
+    "Emotional Buddy 💙": {
+        "role": "You are an empathetic, non-judgmental supportive friend.",
+        "instructions": "Listen actively. Validate their feelings first before offering gentle perspectives. Use a warm, comforting tone. If self-harm is mentioned, immediately provide standard international helpline resources."
+    },
+    "Exam Motivator 🔥": {
+        "role": "You are a disciplined, high-performance academic coach.",
+        "instructions": "Focus on strategy, time management, and eliminating excuses. Use a direct, stoic, 'tough love' approach to inspire action. Prioritize efficiency."
+    },
+    "Adolescent Helper 🌱": {
+        "role": "You are a wise, trustworthy older sibling figure.",
+        "instructions": "Provide safe, factual, and socially aware advice about growing up, puberty, and relationships. Be approachable but responsible. Avoid overly technical jargon."
+    }
+}
 
-# Extra Features
-extra_context = ""
-if "Exam" in mode:
-    exam_date = st.sidebar.date_input("Exam Date", datetime.date.today())
-    days = (exam_date - datetime.date.today()).days
-    if days > 0:
-        st.sidebar.info(f"{days} days left!")
-        extra_context = f"User has an exam in {days} days. Be urgent."
+# ---------------------------------------------------------
+# 5. SIDEBAR NAVIGATION & FEATURES
+# ---------------------------------------------------------
+with st.sidebar:
+    st.title("🤖 LifeCompanion Pro")
+    st.markdown("---")
+    selected_mode = st.radio("Select Persona Mode:", list(personas.keys()))
+    st.markdown("---")
 
-if st.sidebar.button("🗑️ Clear Chat"):
-    st.session_state.messages = []
-    st.rerun()
+    # Dynamic Features based on mode
+    user_context_extra = ""
+    if "Exam" in selected_mode:
+        st.subheader("📅 Study Tracker")
+        deadline = st.date_input("Next Big Deadline")
+        days_left = (deadline - pd.Timestamp.today().date()).days
+        if days_left >= 0:
+           st.caption(f"🗓️ Time remaining: {days_left} days")
+           user_context_extra = f"[CONTEXT: The user has a major deadline in {days_left} days. Use this urgency.]"
+        else:
+           st.error("Deadline passed!")
 
-st.title(mode)
+    elif "Emotional" in selected_mode:
+         st.subheader("🌡️ Vibe Check")
+         stress = st.select_slider("Current Stress Level", options=["Low", "Medium", "High", "Overwhelmed"])
+         user_context_extra = f"[CONTEXT: User reports their stress level is '{stress}'. Adjust tone accordingly.]"
 
-# Chat History
+    st.markdown("---")
+    if st.button("🗑️ Clear Conversation History", type="primary"):
+        st.session_state.messages = []
+        st.rerun()
+    
+    with st.expander("ℹ️ About this App"):
+        st.caption("Powered by Groq (Llama 3 70B). Uses RAG for specific knowledge retrieval. Designed for demo purposes.")
+
+
+# ---------------------------------------------------------
+# 6. MAIN CHAT INTERFACE
+# ---------------------------------------------------------
+st.subheader(f"{selected_mode}")
+
+# Initialize History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display History
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+    avatar = "👤" if msg["role"] == "user" else "🤖"
+    with st.chat_message(msg["role"], avatar=avatar):
+        st.markdown(msg["content"])
 
-# Input
-if prompt := st.chat_input("Type here..."):
+# User Input Handler
+if prompt := st.chat_input("Type your message here..."):
+    # 1. Show User Message
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.write(prompt)
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(prompt)
 
-    # Prepare Prompt
-    db_info = get_context(prompt)
-    sys_prompt = f"You are a helpful AI in {mode} mode."
+    # 2. Prepare Context & System Prompt
+    db_context = get_context(prompt)
+    persona_data = personas[selected_mode]
     
-    full_prompt = f"""
-    SYSTEM: {sys_prompt}
-    CONTEXT: {extra_context}
-    DATA: {db_info}
-    USER: {prompt}
+    system_prompt = f"""
+    ROLE: {persona_data['role']}
+    INSTRUCTIONS: {persona_data['instructions']}
+    
+    RELEVANT KNOWLEDGE BASE INFO: {db_context if db_context else 'None available for this query.'}
+    
+    ADDITIONAL USER CONTEXT: {user_context_extra}
     """
 
-    # Generate Response
-    with st.chat_message("assistant"):
+    # 3. Generate Streaming Response via Groq
+    with st.chat_message("assistant", avatar="🤖"):
+        message_placeholder = st.empty()
+        full_response = ""
         try:
-            # ✅ UPDATED TO A MODEL FROM YOUR LIST
-            model = genai.GenerativeModel("gemini-2.0-flash") 
+            # Using Llama 3 70B for high quality
+            stream = client.chat.completions.create(
+                model="llama3-70b-8192", 
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1024,
+                stream=True # Enable streaming
+            )
             
-            response = model.generate_content(full_prompt)
-            st.write(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+            # Process the stream
+            for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    full_response += chunk.choices[0].delta.content
+                    message_placeholder.markdown(full_response + "▌")
+            
+            # Final update without cursor
+            message_placeholder.markdown(full_response)
+            
         except Exception as e:
-            st.error(f"Connection Error: {e}")
+            st.error(f"API Error: {e}")
+            full_response = "Sorry, I encountered an error connecting to the inference engine."
 
+    # 4. Save Assistant Message
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
