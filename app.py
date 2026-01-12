@@ -4,11 +4,11 @@ import pandas as pd
 import datetime
 
 # ---------------------------------------------------------
-# 1. PAGE SETUP & STYLING
+# 1. PAGE SETUP
 # ---------------------------------------------------------
 st.set_page_config(page_title="LifeCompanion AI", page_icon="🧠", layout="wide")
 
-# Custom CSS for better chat bubbles
+# Custom CSS
 st.markdown("""
 <style>
     .stChatMessage {
@@ -17,26 +17,22 @@ st.markdown("""
         padding: 10px;
         margin-bottom: 5px;
     }
-    .stButton button {
-        width: 100%;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. SECURE API CONNECTION (Hosting Friendly)
+# 2. SECURE CONNECTION (Hosting & Local)
 # ---------------------------------------------------------
-# This logic works for BOTH Local (your PC) and Streamlit Cloud
 try:
-    # Try loading from Streamlit Cloud Secrets
+    # This works when hosted on Streamlit Cloud
     api_key = st.secrets["GOOGLE_API_KEY"]
 except:
-    # FALLBACK: If running locally, you can paste your key here temporarily
-    # DO NOT commit your key to GitHub if you use this method.
+    # This works on your computer. 
+    # REPLACE THE TEXT BELOW WITH YOUR ACTUAL KEY
     api_key = "PASTE_YOUR_AIza_KEY_HERE"
 
 if api_key == "PASTE_YOUR_AIza_KEY_HERE":
-    st.error("⚠️ API Key Missing. Please set it in Streamlit Secrets or line 36.")
+    st.error("⚠️ API Key Missing! Please paste your key in line 28 of the code.")
     st.stop()
 
 genai.configure(api_key=api_key)
@@ -45,14 +41,13 @@ genai.configure(api_key=api_key)
 # 3. KNOWLEDGE BASE
 # ---------------------------------------------------------
 data = {
-    "topic": ["anxiety", "study tips", "acne", "sleep", "procrastination", "motivation"],
+    "topic": ["anxiety", "study tips", "acne", "sleep", "procrastination"],
     "advice": [
-        "Use the 5-4-3-2-1 Grounding Technique to calm down.",
-        "Try the Pomodoro Technique: 25 minutes work, 5 minutes break.",
-        "Wash your face twice daily and avoid touching it.",
-        "Avoid screens 1 hour before bed for better melatonin production.",
-        "Use the '2-Minute Rule': If it takes <2 mins, do it now.",
-        "Action creates motivation, not the other way around. Just start."
+        "Grounding: Name 5 things you see, 4 feel, 3 hear, 2 smell, 1 taste.",
+        "Pomodoro: 25 min work, 5 min break. Repeat 4 times.",
+        "Hygiene: Wash face 2x daily. Change pillowcases.",
+        "Sleep: No screens 1hr before bed. Keep room cool.",
+        "2-Minute Rule: If it takes <2 mins, do it now."
     ]
 }
 df = pd.DataFrame(data)
@@ -64,81 +59,60 @@ def get_context(query):
     return "No specific database record."
 
 # ---------------------------------------------------------
-# 4. SIDEBAR & FEATURE LOGIC
+# 4. UI & LOGIC
 # ---------------------------------------------------------
-st.sidebar.title("🤖 AI Companion")
+st.sidebar.title("🤖 Companion AI")
 mode = st.sidebar.selectbox("Choose Persona:", ["Emotional Buddy 💙", "Exam Motivator 🔥", "Adolescent Helper 🌱"])
 
-# Dynamic Sidebar Features based on Persona
+# Extra Features
 extra_context = ""
-
 if "Exam" in mode:
-    st.sidebar.subheader("📅 Exam Planner")
-    exam_date = st.sidebar.date_input("When is your exam?", datetime.date.today())
-    days_left = (exam_date - datetime.date.today()).days
-    
-    if days_left < 0:
-        st.sidebar.error("Exam date has passed!")
-    else:
-        st.sidebar.info(f"Time remaining: {days_left} days")
-        extra_context = f"IMPORTANT: The user has an exam in {days_left} days. Use this urgency in your response."
+    exam_date = st.sidebar.date_input("Exam Date", datetime.date.today())
+    days = (exam_date - datetime.date.today()).days
+    if days > 0:
+        st.sidebar.info(f"{days} days left!")
+        extra_context = f"User has an exam in {days} days. Be urgent."
 
-elif "Emotional" in mode:
-    st.sidebar.subheader("🌡️ Mood Check")
-    stress_level = st.sidebar.slider("Stress Level (1-10)", 1, 10, 5)
-    extra_context = f"The user's current stress level is {stress_level}/10. Adjust your tone accordingly."
-
-# Clear Chat Button
-if st.sidebar.button("🗑️ Clear Conversation"):
+if st.sidebar.button("🗑️ Clear Chat"):
     st.session_state.messages = []
     st.rerun()
 
-# ---------------------------------------------------------
-# 5. MAIN CHAT INTERFACE
-# ---------------------------------------------------------
-st.title(f"{mode}")
-st.caption("Powered by Gemini 1.5 Flash")
+st.title(mode)
 
-# Initialize Chat History
+# Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display History
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.write(msg["content"])
 
-# User Input
+# Input
 if prompt := st.chat_input("Type here..."):
-    # 1. User Message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.write(prompt)
 
-    # 2. Build Prompt (RAG + Features)
+    # Prepare Prompt
     db_info = get_context(prompt)
+    sys_prompt = f"You are a helpful AI in {mode} mode."
     
-    if "Emotional" in mode:
-        sys_prompt = "You are an empathetic friend. Validate feelings deeply."
-    elif "Exam" in mode:
-        sys_prompt = "You are a strict academic coach. Push for productivity."
-    else:
-        sys_prompt = "You are a wise older sibling. Give factual advice."
-
     full_prompt = f"""
-    SYSTEM ROLE: {sys_prompt}
-    USER CONTEXT: {extra_context}
-    DATABASE INFO: {db_info}
-    USER MESSAGE: {prompt}
+    SYSTEM: {sys_prompt}
+    CONTEXT: {extra_context}
+    DATA: {db_info}
+    USER: {prompt}
     """
 
-    # 3. AI Response
+    # Generate Response
     with st.chat_message("assistant"):
         try:
-            # Using the NEW model name that works
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            # ✅ UPDATED TO A MODEL FROM YOUR LIST
+            model = genai.GenerativeModel("gemini-2.0-flash") 
+            
             response = model.generate_content(full_prompt)
-            st.markdown(response.text)
+            st.write(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
             st.error(f"Connection Error: {e}")
+
