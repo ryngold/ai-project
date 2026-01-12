@@ -2,9 +2,10 @@ import streamlit as st
 from groq import Groq
 import pandas as pd
 import datetime
+import random
 
 # ---------------------------------------------------------
-# 1. PROFESSIONAL PAGE CONFIG & MODERN CSS
+# 1. PAGE CONFIGURATION
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="MindMate Pro",
@@ -13,227 +14,225 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Colorful, Professional UI
+# ---------------------------------------------------------
+# 2. ADVANCED PROFESSIONAL CSS (Glassmorphism)
+# ---------------------------------------------------------
 st.markdown("""
 <style>
     /* Import modern font */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
     
     html, body, [class*="css"] {
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Outfit', sans-serif;
     }
 
-    /* Gradient Background for Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #2E3192 0%, #1BFFFF 100%);
-        color: white;
-    }
-    
-    /* Clean Main Chat Area */
-    .stApp {
-        background-color: #ffffff;
+    /* GLASSMORPHISM CARDS */
+    .stMetric {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
 
-    /* Chat Bubbles */
+    /* CUSTOM CHAT BUBBLES */
     .stChatMessage[data-testid="stChatMessageAvatarUser"] {
-        background-color: #f0f2f6;
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
     }
     .stChatMessage[data-testid="stChatMessageAvatarAssistant"] {
-        background-color: #eef2ff;
-        border-left: 5px solid #4f46e5;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        background: linear-gradient(135deg, rgba(46, 49, 146, 0.1) 0%, rgba(27, 255, 255, 0.1) 100%);
+        border: 1px solid var(--primary-color);
+        border-left: 5px solid var(--primary-color);
     }
-    
-    /* Header Styling */
-    h1 {
-        color: #4f46e5;
-        font-weight: 700;
-    }
-    h3 {
-        color: #333;
-    }
-    
-    /* Button Styling */
-    .stButton button {
-        border-radius: 20px;
+
+    /* GRADIENT HEADER TEXT */
+    .gradient-text {
+        background: linear-gradient(45deg, #FF4B2B, #FF416C);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         font-weight: bold;
+    }
+    
+    /* SIDEBAR STYLING */
+    [data-testid="stSidebar"] {
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. SECURE CLIENT SETUP
+# 3. SECURE SETUP
 # ---------------------------------------------------------
 try:
     groq_api_key = st.secrets["GROQ_API_KEY"]
 except:
-    # Fallback for local testing (Do not commit actual key to GitHub)
     groq_api_key = "PASTE_KEY_HERE_FOR_LOCAL_ONLY"
 
 if groq_api_key.startswith("PASTE") or not groq_api_key:
-    st.error("🚨 **System Halted:** API Key is missing.")
-    st.info("Please go to Streamlit Cloud -> Settings -> Secrets and add your GROQ_API_KEY.")
+    st.error("🚨 API Key Missing. Please set it in Streamlit Secrets.")
     st.stop()
 
 client = Groq(api_key=groq_api_key)
 
 # ---------------------------------------------------------
-# 3. KNOWLEDGE BASE (RAG SYSTEM)
+# 4. KNOWLEDGE BASE & UTILS
 # ---------------------------------------------------------
 data = {
-    "topic": ["anxiety", "study tips", "acne", "sleep", "procrastination", "motivation", "friendship"],
+    "topic": ["anxiety", "study", "acne", "sleep", "procrastination", "motivation", "social"],
     "advice": [
-        "**5-4-3-2-1 Grounding:** Name 5 things you see, 4 you feel, 3 you hear, 2 you smell, 1 you taste.",
-        "**Pomodoro Technique:** 25 mins focus, 5 mins break. After 4 cycles, take a long break.",
-        "**Skincare:** Wash face twice daily. Change pillowcases often. Don't touch your face!",
-        "**Sleep Hygiene:** No blue light 1 hour before bed. Keep room cool (18°C/65°F).",
-        "**2-Minute Rule:** If a task takes <2 mins, do it NOW. Momentum builds motivation.",
-        "Action leads to motivation, not the other way around. Just start for 5 minutes.",
-        "True friends respect boundaries. If you feel drained, it's okay to take space."
+        "🌿 **Grounding:** Name 5 things you see, 4 feel, 3 hear, 2 smell, 1 taste.",
+        "🍅 **Pomodoro:** 25m Focus / 5m Break. Repeat 4x.",
+        "💧 **Skin:** Wash face 2x daily. Don't touch!",
+        "🌙 **Sleep:** No screens 1hr before bed. Cool room.",
+        "🚀 **2-Min Rule:** If it takes <2 mins, do it NOW.",
+        "🔥 **Momentum:** Action creates motivation. Just start.",
+        "🤝 **Boundaries:** It is okay to say no to protect your peace."
     ]
 }
 df = pd.DataFrame(data)
 
 def get_rag_context(query):
-    """Finds best advice from the database."""
     for i, row in df.iterrows():
         if row['topic'] in query.lower():
             return row['advice']
     return None
 
+def convert_chat_to_text(messages):
+    """Converts chat history to a downloadable text string."""
+    chat_text = "--- MINDMATE PRO CHAT LOG ---\n\n"
+    for msg in messages:
+        role = "USER" if msg["role"] == "user" else "AI"
+        chat_text += f"{role}: {msg['content']}\n\n"
+    return chat_text
+
 # ---------------------------------------------------------
-# 4. PERSONAS & SIDEBAR FEATURES
+# 5. SIDEBAR DASHBOARD
 # ---------------------------------------------------------
 personas = {
-    "Emotional Buddy 💙": {
-        "role": "You are a warm, empathetic therapist friend.",
-        "tone": "Use soothing language. Validate feelings. Never judge.",
-        "color": "#e3f2fd"
-    },
-    "Exam Motivator 🔥": {
-        "role": "You are a high-energy, strict performance coach.",
-        "tone": "Be direct. Use 'tough love'. Focus on discipline and deadlines.",
-        "color": "#fff3e0"
-    },
-    "Adolescent Helper 🌱": {
-        "role": "You are a cool, wise older sibling.",
-        "tone": "Be casual but responsible. Use emojis. Avoid being 'cringe'.",
-        "color": "#e8f5e9"
-    }
+    "Emotional Buddy": {"icon": "💙", "role": "Empathetic Therapist", "tone": "Warm, validating, soothing."},
+    "Exam Motivator": {"icon": "🔥", "role": "Strict Coach", "tone": "Direct, urgent, disciplined."},
+    "Adolescent Helper": {"icon": "🌱", "role": "Wise Sibling", "tone": "Casual, safe, non-judgmental."}
 }
 
-# SIDEBAR DESIGN
 with st.sidebar:
-    st.title("🧠 MindMate Pro")
-    st.markdown("*Your AI Companion for Life*")
-    st.divider()
+    st.title(f"🧠 MindMate Pro")
+    st.caption("Your AI Life Companion")
+    st.markdown("---")
     
-    # 1. Mode Selection
-    selected_mode = st.radio("Choose Your Companion:", list(personas.keys()))
+    # 1. PERSONA SELECTOR
+    mode_name = st.selectbox("Choose Persona", list(personas.keys()))
+    current_persona = personas[mode_name]
     
-    # 2. Dynamic Tools
+    st.markdown("---")
+
+    # 2. DYNAMIC TOOLS
     extra_context = ""
-    st.divider()
-    
-    if "Exam" in selected_mode:
+    if "Exam" in mode_name:
         st.subheader("📅 Exam Countdown")
-        exam_date = st.date_input("Next Exam Date", datetime.date.today())
-        days_left = (exam_date - datetime.date.today()).days
-        if days_left >= 0:
-            st.metric("Days Remaining", f"{days_left} Days")
-            if days_left < 3:
-                st.warning("⚠️ Crunch time! Focus is critical.")
-                extra_context = f"[CRITICAL: User has an exam in {days_left} days. BE URGENT.]"
-            else:
-                extra_context = f"[CONTEXT: Exam is in {days_left} days. Help them plan.]"
+        exam_date = st.date_input("Target Date", datetime.date.today())
+        days = (exam_date - datetime.date.today()).days
+        if days >= 0:
+            st.metric("Days Remaining", f"{days}", delta=f"-1 Day")
+            extra_context = f"[URGENT: Exam in {days} days]"
+        else:
+            st.error("Date passed!")
+            
+    elif "Emotional" in mode_name:
+        st.subheader("🌡️ Vibe Check")
+        mood = st.select_slider("Current Mood", ["😞", "😐", "🙂", "🤩"])
+        st.write(f"Tracking: **{mood}**")
+        extra_context = f"[MOOD: {mood}]"
+
+    st.markdown("---")
+
+    # 3. FEATURE: DAILY WISDOM CARD
+    st.subheader("💡 Daily Wisdom")
+    if "daily_tip" not in st.session_state:
+        st.session_state.daily_tip = random.choice(df['advice'].tolist())
+    st.info(st.session_state.daily_tip)
+
+    # 4. DOWNLOAD CHAT
+    if "messages" in st.session_state and len(st.session_state.messages) > 0:
+        st.markdown("---")
+        chat_str = convert_chat_to_text(st.session_state.messages)
+        st.download_button(
+            label="📥 Download Chat",
+            data=chat_str,
+            file_name="mindmate_chat.txt",
+            mime="text/plain"
+        )
     
-    elif "Emotional" in selected_mode:
-        st.subheader("🌡️ Emotional Check-in")
-        mood = st.select_slider("How are you feeling?", options=["😞", "😐", "🙂", "🤩"])
-        extra_context = f"[CONTEXT: User mood is {mood}. Adjust empathy accordingly.]"
-
-    # 3. Utility Buttons
-    st.divider()
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️ Clear", help="Wipe chat history"):
-            st.session_state.messages = []
-            st.rerun()
-    with col2:
-        with st.expander("📚 Topics"):
-            st.write(df['topic'].tolist())
+    # Clear Button
+    if st.button("🗑️ Reset All", type="primary"):
+        st.session_state.messages = []
+        st.rerun()
 
 # ---------------------------------------------------------
-# 5. MAIN CHAT INTERFACE
+# 6. MAIN INTERFACE
 # ---------------------------------------------------------
-current_persona = personas[selected_mode]
+# Header Area
+col1, col2 = st.columns([1, 5])
+with col1:
+    st.title(current_persona["icon"])
+with col2:
+    st.markdown(f"<h1 style='padding-top:10px;'>{mode_name}</h1>", unsafe_allow_html=True)
+    st.caption(f"Identity: {current_persona['role']} • Powered by Llama 3")
 
-# Header
-st.title(f"{selected_mode}")
-st.caption(f"Powered by Groq Llama 3 • {current_persona['role']}")
-
-# Initialize Chat History
+# Initialize History
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    # Add a welcoming starting message
-    welcome_msg = f"Hello! I'm your {selected_mode.split()[0]} Buddy. How can I help you today?"
-    st.session_state.messages.append({"role": "assistant", "content": welcome_msg})
+    # Welcome Message
+    st.session_state.messages.append({
+        "role": "assistant", 
+        "content": f"Hello! I'm your **{mode_name}**. How can I support you right now?"
+    })
 
-# Display Chat
+# Render Chat
 for msg in st.session_state.messages:
     avatar = "👤" if msg["role"] == "user" else "🤖"
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-# User Input & Processing
-if prompt := st.chat_input("Type your message..."):
-    # 1. Show User Message
+# Input Area
+if prompt := st.chat_input("Type here..."):
+    # User Msg
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    # 2. Build the "Brain" (Prompt Engineering)
+    # RAG & Prompt
     db_advice = get_rag_context(prompt)
-    
-    system_instruction = f"""
-    ROLE: {current_persona['role']}
-    TONE: {current_persona['tone']}
-    
-    USER SITUATION: {extra_context}
-    
-    KNOWLEDGE BASE (Use if relevant): {db_advice if db_advice else "No specific database entry."}
-    
-    INSTRUCTION: Keep responses concise, helpful, and human-like. 
+    sys_msg = f"""
+    ROLE: {current_persona['role']} ({current_persona['tone']})
+    USER CONTEXT: {extra_context}
+    KNOWLEDGE BASE: {db_advice}
     """
 
-    # 3. Generate Response (Streaming)
+    # AI Response
     with st.chat_message("assistant", avatar="🤖"):
-        message_placeholder = st.empty()
+        placeholder = st.empty()
         full_response = ""
         try:
-            # Using the NEW STABLE MODEL
             stream = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": system_instruction},
+                    {"role": "system", "content": sys_msg},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
                 max_tokens=1024,
                 stream=True
             )
-            
             for chunk in stream:
                 if chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    full_response += content
-                    message_placeholder.markdown(full_response + "▌")
+                    full_response += chunk.choices[0].delta.content
+                    placeholder.markdown(full_response + "▌")
+            placeholder.markdown(full_response)
             
-            message_placeholder.markdown(full_response)
-        
         except Exception as e:
-            st.error(f"Connection Error: {e}")
-            full_response = "I'm having trouble connecting right now. Please try again."
+            st.error(f"Error: {e}")
+            full_response = "Connection error. Please check API Key."
 
-    # 4. Save History
     st.session_state.messages.append({"role": "assistant", "content": full_response})
