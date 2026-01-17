@@ -1,0 +1,1 @@
+MindMate Pro is an advanced, context-aware chatbot designed to support users with emotional well-being and academic productivity. Unlike standard AI, it uses a Multi-Persona System (Emotional Buddy, Exam Coach, Adolescent Helper) to adapt its tone and advice to your specific needs
